@@ -2,34 +2,80 @@
 dependency:
   name: galaxy
 driver:
-  name: docker
+  name: containers
 platforms:
   - name: debian-buster
-    image: debian:buster
-    pre_build_image: false
-    # tmpfs:
-    #   - /run
-    #   - /tmp
-    # volumes:
-    #   - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    # capabilities:
-    #   - SYS_ADMIN
+    image: ghcr.io/test-kitchen/dokken/debian-10
+    pre_build_image: true
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /lib/systemd/systemd
   - name: debian-bullseye
-    image: debian:bullseye
-    pre_build_image: false
+    image: ghcr.io/test-kitchen/dokken/debian-11
+    pre_build_image: true
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /lib/systemd/systemd
   - name: debian-bookworm
-    image: debian:bookworm
+    image: ghcr.io/test-kitchen/dokken/debian-12
     pre_build_image: false
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /lib/systemd/systemd
   - name: ubuntu-focal
-    image: ubuntu:focal
-    pre_build_image: false
+    image: ghcr.io/test-kitchen/dokken/ubuntu-20.04
+    pre_build_image: true
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /lib/systemd/systemd
   - name: ubuntu-jammy
-    image: ubuntu:jammy
-    pre_build_image: false
+    image: ghcr.io/test-kitchen/dokken/ubuntu-22.04
+    pre_build_image: true
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /lib/systemd/systemd
+  - name: almalinux-8
+    image: dokken/almalinux-8
+    pre_build_image: true
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /lib/systemd/systemd
+  - name: centos-7
+    image: dokken/centos-7
+    pre_build_image: true
+    privileged: true
+    cgroup_parent: docker.slice
+    command: /usr/lib/systemd/systemd
 provisioner:
   name: ansible
   options:
-   vvv: true
+    vvv: true
+  env:
+    ANSIBLE_FORCE_COLOR: true
+  inventory:
+    group_vars:
+      all:
+        #  teleport__version: 8
+        teleport__agent: true
+        teleport__nodename: "test.node"
+        teleport__proxy: true
+        teleport__proxy_public_addr: "toto.tp.com:443"
+        teleport__proxy_acme: false
+        teleport__proxy_acme_email: "test@toto.com"
+        teleport__node: false
+        # teleport__node_token: ""
+        # teleport__node_server: ""
+        teleport__auth: true
+        teleport__auth_cluster_name: "toto.tp.com"
+        teleport__ssh: true
+        teleport__ssh_labels:
+          tenant: toto.com
+          bla: test
+    host_vars:
+      centos-7:
+        teleport__binary_compat: true
+      almalinux-8:
+        teleport__binary_compat: true
 verifier:
   name: ansible
 lint: |

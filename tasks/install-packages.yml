@@ -1,42 +1,41 @@
 ---
+- name: "Collect package facts to check if Teleport is installed"
+  ansible.builtin.package_facts:
+    manager: auto
 
-- name: Install APT https transport
-  apt:
+- name: "Install APT https transport"
+  ansible.builtin.apt:
     package: apt-transport-https
-    update_cache: yes
+    update_cache: true
     state: present
 
-- name: Register repository signing key
-  apt_key:
+- name: "Register repository signing key"
+  ansible.builtin.apt_key:
     url: "{{ teleport__apt_repo_key }}"
   when: teleport__apt_signing_legacy
 
-- name: Ensire /usr/share/keyrings/ exists
-  file:
+- name: "Ensure /usr/share/keyrings/ exists"
+  ansible.builtin.file:
     path: "/usr/share/keyrings"
     state: directory
     mode: '0755'
   when: not teleport__apt_signing_legacy
 
-- name: Download repository signing key
+- name: "Download repository signing key"
   ansible.builtin.get_url:
     url: "{{ teleport__apt_repo_key }}"
     dest: /usr/share/keyrings/teleport-archive-keyring.asc
     mode: '0644'
-    force: no
   when: not teleport__apt_signing_legacy
 
-- name: Add or update Teleport's APT repository
-  ansible.builtin.template:
-    dest: "/etc/apt/sources.list.d/teleport.list"
-    src: "teleport.list.j2"
-    owner: root
-    group: root
-    mode: 0444
-  register: apt_repo_template
+- name: "Add or update Teleport's APT repository"
+  ansible.builtin.apt_repository:
+    repo: deb {% if not teleport__apt_signing_legacy %}[signed-by=/usr/share/keyrings/teleport-archive-keyring.asc]{% endif %} {{ teleport__apt_repo }}
+    filename: teleport
+    update_cache: true
 
-- name: Remove legacy debian repository drop-in files
-  file:
+- name: "Remove legacy debian repository drop-in files"
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -44,35 +43,30 @@
     - /etc/apt/sources.list.d/apt_releases_teleport_dev_ubuntu.list
     - /etc/apt/sources.list.d/apt_releases_teleport_dev_debian.list
 
-- name: Remove legacy debian repository from /etc/apt/sources.list
-  apt_repository:
+- name: "Remove legacy debian repository from /etc/apt/sources.list"
+  ansible.builtin.apt_repository:
     repo: "{{ teleport__legacy_apt_repo }}"
     state: absent
-    update_cache: yes
+    update_cache: true
 
-- name: Remove Enix.io debian repository
-  apt_repository:
+- name: "Remove Enix.io debian repository"
+  ansible.builtin.apt_repository:
     repo: "{{ teleport__enix_apt_repo }}"
     state: absent
-    update_cache: yes
+    update_cache: true
 
 # Task used for some migration where package was in Hold status.
-# We allow to fail when package is not installed.
-- name: UnHold teleport package version
-  dpkg_selections:
+- name: "UnHold Teleport package version"
+  ansible.builtin.dpkg_selections:
     name: teleport
     selection: install
-  ignore_errors: True
+  when: "'teleport' in ansible_facts.packages"
 
-- name: Update APT cache
+- name: "Install Teleport package"
   ansible.builtin.apt:
-    update_cache: yes
-  when: apt_repo_template.changed
-
-- name: Install teleport package
-  apt:
     package: "teleport"
-    state: latest
-    update_cache: yes
+    only_upgrade: "{{ true if 'teleport' in ansible_facts.packages else omit }}"
+    state: present
+    update_cache: true
   notify:
     - restart teleport
